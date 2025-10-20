@@ -1,0 +1,43 @@
+<infinispan
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="urn:infinispan:config:15.0 https://infinispan.org/schemas/infinispan-config-15.0.xsd
+                        urn:infinispan:server:15.0 https://infinispan.org/schemas/infinispan-server-15.0.xsd"
+        xmlns="urn:infinispan:config:15.0"
+        xmlns:server="urn:infinispan:server:15.0">
+
+   <cache-container name="SampleCacheManager" statistics="true" default-cache="the-default-cache" shutdown-hook="DEFAULT">
+      <local-cache-configuration name="the-default-cache" statistics="true" />
+
+      <!-- Entity cache -->
+      <local-cache-configuration name="entity" simple-cache="true" statistics="true">
+         <encoding media-type="application/x-java-object"/>
+         <transaction mode="NONE" />
+         <expiration max-idle="300000" interval="5000"/> <!-- 5 minutes -->
+         <memory max-count="10000" when-full="REMOVE"/>
+      </local-cache-configuration>
+
+      <!-- Query cache -->
+      <local-cache-configuration name="local-query" simple-cache="true" statistics="true">
+         <encoding media-type="application/x-java-object"/>
+         <transaction mode="NONE"/>
+         <expiration max-idle="300000" interval="5000"/> <!-- 5 minutes -->
+         <memory max-count="10000" when-full="REMOVE"/>
+      </local-cache-configuration>
+
+      <!-- Timestamps cache -->
+      <local-cache-configuration name="timestamps" simple-cache="true" statistics="true">
+         <encoding media-type="application/x-java-object"/>
+         <locking concurrency-level="1000" acquire-timeout="15000"/>
+         <transaction mode="NONE"/>
+         <expiration interval="0"/>
+         <memory when-full="NONE"/>
+      </local-cache-configuration>
+
+      <!-- Pending puts cache -->
+      <local-cache-configuration name="pending-puts" simple-cache="true" statistics="true">
+         <encoding media-type="application/x-java-object"/>
+         <transaction mode="NONE"/>
+         <expiration max-idle="60000" /> <!-- 1 minute -->
+      </local-cache-configuration>
+   </cache-container>
+</infinispan>

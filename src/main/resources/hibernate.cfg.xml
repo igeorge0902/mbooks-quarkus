@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE hibernate-configuration SYSTEM "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
+<!-- it uses local dtd file -->
+<hibernate-configuration>
+    <session-factory>
+        <property name="hibernate.connection.url">jdbc:mysql://localhost:3306/book</property>
+        <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
+        <property name="hibernate.connection.CharSet">utf8</property>
+        <property name="hibernate.connection.charecterEncoding">utf8</property>
+        <property name="hibernate.connection.username">sqluser</property>
+        <property name="hibernate.connection.password">sqluserpw</property>
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQLDialect</property>
+        <property name="hibernate.current_session_context_class">thread</property>
+        <property name="hibernate.connection.autocommit">false</property>
+<!-- <property name="hibernate.hbm2ddl.auto">create</property> -->
+        <property name="hibernate.show_sql">false</property>
+        <property name="hibernate.format_sql">true</property>
+        <property name="hibernate.default_batch_fetch_size">10</property>
+        <property name="hibernate.jdbc.batch_size">20</property>
+        <property name="hibernate.order_inserts">true</property>
+        <property name="hibernate.order_updates">true</property>
+        <property name="hibernate.generate_statistics">true</property>
+        <property name="hibernate.c3p0.min_size">5</property>
+        <property name="hibernate.c3p0.max_size">100</property>
+        <property name="hibernate.c3p0.timeout">300</property>
+        <property name="hibernate.c3p0.idle_test_period">60</property>
+        <property name="hibernate.c3p0.max_statements">200</property>
+        <property name="hibernate.cache.use_second_level_cache">true</property>
+        <property name="hibernate.cache.region.factory_class">infinispan</property>
+        <property name="hibernate.cache.infinispan.cfg">infinispan-configs-local.xml</property>
+        <property name="hibernate.cache.use_query_cache">true</property>
+        <mapping class="com.jeet.api.Ticket" />
+        <mapping class="com.jeet.api.Movie" />
+        <mapping class="com.jeet.api.Screen" />
+        <mapping class="com.jeet.api.Seats" />
+        <mapping class="com.jeet.api.Venues" />
+        <mapping class="com.jeet.api.ScreeningDates" />
+        <mapping class="com.jeet.api.Location" />
+        <mapping class="com.jeet.api.Purchase" />
+        <mapping class="com.jeet.broadcasting.eventModel.AddMovie" />
+        <class-cache class="com.jeet.api.Movie" include="all" region="movies" usage="read-write" />
+        <class-cache class="com.jeet.api.Venues" include="all" region="venues" usage="read-write" />
+        <class-cache class="com.jeet.api.Location" include="all" region="location" usage="read-write" />
+        <class-cache class="com.jeet.api.Ticket" include="all" region="ticket" usage="read-write" />
+    </session-factory>
+</hibernate-configuration>

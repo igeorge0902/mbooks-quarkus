@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.jeet.com/api"
+	xmlns:tns="http://www.jeet.com/api" elementFormDefault="qualified">
+
+	<element name="ticket">
+		<complexType>
+			<sequence>
+				<element name="ticketId" type="int" />
+				<element name="price" type="int" />
+				<element ref="tns:screen"/>		
+				<element ref="tns:seat"/>	
+			</sequence>
+		</complexType>
+	</element>
+	
+	<element name="seat">
+		<complexType>
+			<sequence>
+				<element name="seatNum" type="string" />
+				<element name="seatDesc" type="string" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="movie">
+		<complexType>
+			<sequence>
+				<element name="movieId" type="int" />
+				<element name="name" type="string" />
+				<element name="detail" type="string" />
+			</sequence>
+		</complexType>
+	</element>
+
+	<element name="screen">
+		<complexType>
+			<sequence>
+				<element name="screenId" type="string" />
+				<element name="seats" type="int"/>
+				<element ref="tns:movie"/>
+				<element ref="tns:seat" maxOccurs="unbounded"/>
+			</sequence>
+		</complexType>
+	</element>
+
+
+</schema>
