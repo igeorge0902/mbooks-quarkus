@@ -1,84 +1,91 @@
 # mbooks-quarkus
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Movie catalog, seat booking, and payment API for the Cinemas booking platform. Runs on port **8080** under context path `/mbooks-1`.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## What it does
 
-## Running the application in dev mode
+- **Movie catalog** — Browse all movies (`GET /rest/book/movies`), search by name or full-text, filter by category.
+- **Venue & screening lookup** — `GET /rest/book/venues/{movieId}` returns venues, screens, and screening dates for a movie.
+- **Seat selection** — `GET /rest/book/seats/{screenId}` returns the seat map with reservation status.
+- **Booking & payment** — `POST /rest/book/payment/fullcheckout2` reserves seats with pessimistic locking, processes payment via Braintree (sandbox), records the purchase.
+- **Purchase history** — `GET /rest/book/purchases` lists all purchases for a user; `/purchases/tickets?purchaseId=` returns ticket details.
+- **Ticket management** — Cancel tickets or delete purchases via `/purchases/manage` and `/purchases/delete`.
+- **Realtime** — Kafka producer publishes to `ios-movies-notifications2`; Kafka consumer broadcasts via WebSocket at `/ws`.
 
-You can run your application in dev mode that enables live coding using:
+## Architecture
 
-```shell script
-./mvnw quarkus:dev
+```
+dalogin / iOS / Web
+  │
+  ▼
+mbooks (:8080, /mbooks-1)
+  ├── BookController (1171 lines) ── movies, venues, seats, checkout, purchases
+  ├── TicketService ── pessimistic-lock seat reservation + rollback
+  ├── PaymentService ── Braintree gateway (sandbox) integration
+  ├── PurchaseDAO ── purchase/ticket CRUD
+  ├── BookingHandlerImpl ── orchestration layer
+  ├── DAO (singleton) ── Hibernate session management via HibernateUtil
+  ├── KafkaMessageProducer ── publishes movie events
+  └── KafkaListener → WebSocketServer.broadcastMessage()
+           ▼
+       MySQL book
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## REST endpoints
 
-## Packaging and running the application
+| Path | Method | Description |
+|------|--------|-------------|
+| `/rest/book/hello` | GET | Health check |
+| `/rest/book/movies` | GET | All movies (paginated, filterable by category) |
+| `/rest/book/movies/{name}/{order}` | GET | Search movies by name |
+| `/rest/book/movies/search?match=&category=` | GET | Full-text search |
+| `/rest/book/movie/{movieId}` | GET | Single movie details |
+| `/rest/book/venues/{movieId}` | GET | Venues + screenings for a movie |
+| `/rest/book/seats/{screenId}` | GET | Seat map for a screen |
+| `/rest/book/payment/clientToken` | GET | Generate Braintree client token |
+| `/rest/book/payment/fullcheckout2` | POST | Reserve seats + process Braintree payment |
+| `/rest/book/payment/webcheckout` | POST | Web-only checkout |
+| `/rest/book/purchases` | GET | User's purchase history (uuid header required) |
+| `/rest/book/purchases/tickets?purchaseId=` | GET | Tickets for a purchase |
+| `/rest/book/purchases/manage` | POST | Cancel tickets |
+| `/rest/book/purchases/delete` | DELETE | Delete a purchase |
 
-The application can be packaged using:
+## Database
 
-```shell script
-./mvnw package
+Uses MySQL schema **`book`** via singleton Hibernate session (`DAO.instance()` + `HibernateUtil`).
+
+| Entity | Table | Key relationships |
+|--------|-------|-------------------|
+| `Movie` | Movie | 1:N → Screen |
+| `Screen` | Screen | N:1 → Movie, 1:1 → ScreeningDates, 1:N → Seats |
+| `ScreeningDates` | ScreeningDates | 1:1 ← Screen, N:1 → Venues |
+| `Venues` | Venues | 1:1 → Screen, N:1 → Location |
+| `Location` | location | Referenced by Venues |
+| `Seats` | Seats | N:1 → Screen |
+| `Ticket` | Ticket | 1:1 → Screen, N:1 → Seats, N:1 → Purchase |
+| `Purchase` | Purchase | 1:N → Ticket (uuid-based user link) |
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_URL_BOOKS` | `jdbc:mysql://localhost:3306/book` | JDBC URL for the book database |
+| `BOOTSTRAP_URL` | `localhost:9092` | Kafka bootstrap server |
+
+## Build & Run
+
+```bash
+./mvnw quarkus:dev                    # dev mode on port 8080
+./mvnw package -DskipTests            # package for container
+podman build -t mbooks-quarkus:local .
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+## Part of the Cinemas platform
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
-```
-
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
-
-## Creating a native executable
-
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
-```
-
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./target/mbooks-quarkus-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- SmallRye Health ([guide](https://quarkus.io/guides/smallrye-health)): Monitor service health
-- Hibernate ORM ([guide](https://quarkus.io/guides/hibernate-orm)): Define your persistent model with Hibernate ORM and Jakarta Persistence
-- JDBC Driver - MySQL ([guide](https://quarkus.io/guides/datasource)): Connect to the MySQL database via JDBC
-- REST ([guide](https://quarkus.io/guides/rest)): A Jakarta REST implementation utilizing build time processing and Vert.x. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it.
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-
-## Provided Code
-
-### Hibernate ORM
-
-Create your first JPA entity
-
-[Related guide section...](https://quarkus.io/guides/hibernate-orm)
-
-
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
-
-### SmallRye Health
-
-Monitor your application's health using SmallRye Health
-
-[Related guide section...](https://quarkus.io/guides/smallrye-health)
+| Service | Repo | Role |
+|---------|------|------|
+| dalogin-quarkus | [igeorge0902/dalogin-quarkus](https://github.com/igeorge0902/dalogin-quarkus) | Auth gateway |
+| mbook-quarkus | [igeorge0902/mbook-quarkus](https://github.com/igeorge0902/mbook-quarkus) | User/device API |
+| **mbooks-quarkus** | this repo | Movie/booking/payment API |
+| simple-service-webapp-quarkus | [igeorge0902/simple-service-webapp-quarkus](https://github.com/igeorge0902/simple-service-webapp-quarkus) | Image server |
+| k8infra | [igeorge0902/k8infra](https://github.com/igeorge0902/k8infra) | Kubernetes manifests, SQL fixes, deploy runbook |
