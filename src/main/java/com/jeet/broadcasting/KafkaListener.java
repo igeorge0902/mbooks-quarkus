@@ -31,10 +31,10 @@ public class KafkaListener {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
 
         consumer = new KafkaConsumer<>(props);
-        consumer.subscribe(Collections.singletonList("ios-movies-notifications"));
+        consumer.subscribe(Collections.singletonList("ios-movies-notifications2"));
 
         consumerThread = new Thread(() -> {
-            while (true) {
+            while (running) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
                 for (ConsumerRecord<String, String> record : records) {
                     WebSocketServer.broadcastMessage(record.value());
@@ -53,5 +53,6 @@ public class KafkaListener {
             consumerThread.join(2000);
         } catch (InterruptedException ignored) {
         }
+        consumer.close();
     }
 }

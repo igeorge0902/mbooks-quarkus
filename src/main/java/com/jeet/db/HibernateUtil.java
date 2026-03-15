@@ -17,8 +17,8 @@ public class HibernateUtil {
             StandardServiceRegistryBuilder registryBuilder = new StandardServiceRegistryBuilder().configure("hibernate.cfg.xml");
 
             // Apply overrides from environment variables (if present)
-            if (System.getenv("${DB_URL_BOOKS}") != null) {
-                registryBuilder.applySetting("hibernate.connection.url", System.getenv("DB_URL"));
+            if (System.getenv("DB_URL_BOOKS") != null) {
+                registryBuilder.applySetting("hibernate.connection.url", System.getenv("DB_URL_BOOKS"));
             }
 
             StandardServiceRegistry standardRegistry = registryBuilder.build();
