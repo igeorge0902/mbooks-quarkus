@@ -93,7 +93,19 @@ public class BookingHandlerImpl {
 	
 	public List<Location> getAllLocations() throws InterruptedException {
 		
-		List<Location> locations = DAO.instance().getAllLocations();		
+		List<Location> rawLocations = DAO.instance().getAllLocations();
+		List<Location> locations = new ArrayList<Location>();
+
+		for (int i = 0; i < rawLocations.size(); i++) {
+			Location loc = new Location();
+			loc.setLocationId(rawLocations.get(i).getLocationId());
+			loc.setName(rawLocations.get(i).getName());
+			loc.setFormatted_address(rawLocations.get(i).getFormatted_address());
+			loc.setLatitude(rawLocations.get(i).getLatitude());
+			loc.setLongitude(rawLocations.get(i).getLongitude());
+			loc.setThumnbnail(rawLocations.get(i).getThumbnail());
+			locations.add(loc);
+		}
 
 		return locations;	
 	}
@@ -138,7 +150,21 @@ public class BookingHandlerImpl {
 	
 	public List<Location> getLocationForMovie(int movieId) throws InterruptedException {
 		
-		List<Location> locations = DAO.instance().getLocationForMovie(movieId);
+		List<Location> rawLocations = DAO.instance().getLocationForMovie(movieId);
+		List<Location> locations = new ArrayList<Location>();
+
+		for (int i = 0; i < rawLocations.size(); i++) {
+
+			Location loc = new Location();
+			loc.setLocationId(rawLocations.get(i).getLocationId());
+			loc.setName(rawLocations.get(i).getName());
+			loc.setFormatted_address(rawLocations.get(i).getFormatted_address());
+			loc.setLatitude(rawLocations.get(i).getLatitude());
+			loc.setLongitude(rawLocations.get(i).getLongitude());
+			loc.setThumnbnail(rawLocations.get(i).getThumbnail());
+
+			locations.add(loc);
+		}
 
 		return locations;	
 	}

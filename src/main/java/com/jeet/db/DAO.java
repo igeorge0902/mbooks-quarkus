@@ -24,18 +24,10 @@ public class DAO {
 
 	private static DAO instance;
 	private final SessionFactory factory;
-	private static volatile Session session;
-	private static volatile Transaction trans;
-	private static volatile Seats seat;
-	private static volatile Purchase purchase;
-	private static volatile Screen screen;
-	private static volatile boolean isIndexingRunning;
 	private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
 	/**
-	 * Intantiate DAO class that loads configured SessionFactory object.
-	 * You can also configure further settings for the session.
-	 *
+	 * Instantiate DAO class that loads configured SessionFactory object.
 	 */
 	public DAO() throws InterruptedException {
 
@@ -45,18 +37,13 @@ public class DAO {
 		Statistics stats = factory.getStatistics();
 		stats.setStatisticsEnabled(true);
 
-		session = factory.openSession();
-		session.setFlushMode(FlushModeType.AUTO);
-
 		// clear cache
 		factory.getCache().evictAllRegions();
 		System.out.println("Cache cleared.");
-
 	}
 
 	/**
-	 * DAO instance is always synchronized, for sake of memory consistency,
-	 * and we use a shared static session object.
+	 * DAO instance — synchronized only for singleton initialisation.
 	 *
 	 * @return DAO instance
 	 */
@@ -67,194 +54,135 @@ public class DAO {
 		return instance;
 	}
 
+	// ────────────────────────────────────────────────────────
+	//  Read-only query methods — session-per-call, no lock
+	// ────────────────────────────────────────────────────────
+
 	/**
 	 * Returns a movie object by movieId.
-	 *
-	 * @param movieId
-	 * @return
 	 */
-	public synchronized Movie getMovie(int movieId){
-
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
-
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+	public Movie getMovie(int movieId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+			Movie movie = session.get(Movie.class, movieId);
+			trans.commit();
+			return movie;
 		}
-
-		Movie movie = session.get(Movie.class, movieId);
-
-		trans.commit();
-
-		return movie;
 	}
 
 	/**
 	 * Returns all the movies as a list.
-	 *
-	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public synchronized List<Movie> getAllMovies(int setFirstResult, String category) {
+	public List<Movie> getAllMovies(int setFirstResult, String category) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			List<Movie> movies;
+			String hql;
+			if (category.isBlank()) {
+				hql = "from Movie order by name asc";
+			} else {
+				hql = "from Movie where category = :mCategory order by name asc";
+			}
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
+			if (setFirstResult == -1 && category.equals("")) {
+				movies = session.createQuery(hql, Movie.class)
+						.setCacheable(true)
+						.setCacheRegion("movies")
+						.setCacheMode(CacheMode.NORMAL)
+						.getResultList();
 
-			trans.begin();
+			} else if (!category.isEmpty() && setFirstResult > -1) {
+				movies = session.createQuery(hql)
+						.setCacheable(true)
+						.setParameter("mCategory", category)
+						.setCacheRegion("movies")
+						.setCacheMode(CacheMode.NORMAL)
+						.setFirstResult(setFirstResult)
+						.setMaxResults(30).getResultList();
+
+			} else {
+				movies = session.createQuery(hql)
+						.setCacheable(true)
+						.setCacheRegion("movies")
+						.setCacheMode(CacheMode.NORMAL)
+						.setFirstResult(setFirstResult)
+						.setMaxResults(30).getResultList();
+			}
+
+			trans.commit();
+			return movies;
 		}
-
-		List<Movie> movies;
-		String hql;
-		if(category.isBlank()) {
-			hql = "from Movie order by name asc";
-		} else {
-			hql = "from Movie where category = :mCategory order by name asc";
-		}
-
-		if(setFirstResult == -1 && category.equals("")) {
-			movies = session.createQuery(hql, Movie.class)
-					.setCacheable(true)
-					.setCacheRegion("movies")
-					.setCacheMode(CacheMode.NORMAL)
-					.getResultList();
-
-		} else if(!category.isEmpty() && setFirstResult > -1) {
-			movies = session.createQuery(hql)
-					.setCacheable(true)
-					.setParameter("mCategory", category)
-					.setCacheRegion("movies")
-					.setCacheMode(CacheMode.NORMAL)
-					.setFirstResult(setFirstResult)
-					.setMaxResults(30).getResultList();
-
-		} else {
-			movies = session.createQuery(hql)
-					.setCacheable(true)
-					.setCacheRegion("movies")
-					.setCacheMode(CacheMode.NORMAL)
-					.setFirstResult(setFirstResult)
-					.setMaxResults(30).getResultList();
-
-		}
-
-
-		trans.commit();
-
-		return movies;
 	}
 
 	/**
 	 * Returns a list of movies matching the search criteria.
-	 *
-	 * @param name
-	 * @param order
-	 * @return
 	 */
-	public synchronized List<Movie> searchMovies(String name, String order){
+	public List<Movie> searchMovies(String name, String order) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "from Movie m where name like '%" + name + "%' order by m.name " + order;
+			List<Movie> list = session.createQuery(hql)
+					.setCacheable(true)
+					.setCacheRegion("movies").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "from Movie m where name like '%"+name+"%' order by m.name "+order;
-		List<Movie> list = session.createQuery(hql)
-				.setCacheable(true)
-				.setCacheRegion("movies").getResultList();
-
-		//query.setParameter("mName", "%"+name+"%");
-		//query.setParameter("mOrder", order);
-
-		trans.commit();
-
-		return list;
 	}
-
 
 	/**
 	 * Returns all seats for a screen (movie/venue) by screeningDateId.
-	 *
-	 * @param screeningDateId
-	 * @return
 	 */
-	public synchronized List<Seats> getSeatsForScreening(int screeningDateId) {
+	public List<Seats> getSeatsForScreening(int screeningDateId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select screeningdates.venues.screen.seat from ScreeningDates as screeningdates where screeningDatesId = :mScreeningDatesId";
+			List<Seats> list = session.createQuery(hql)
+					.setParameter("mScreeningDatesId", screeningDateId).getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select screeningdates.venues.screen.seat from ScreeningDates as screeningdates where screeningDatesId = :mScreeningDatesId";
-
-		List<Seats> list = session.createQuery(hql)
-				.setParameter("mScreeningDatesId", screeningDateId).getResultList();
-
-		trans.commit();
-
-		return list;
 	}
 
 	/**
 	 * Returns seats state (availability).
-	 *
-	 * @param screeningDatesId
-	 * @param seatNumber
-	 * @return
 	 */
 	public synchronized Seats getSeatForAvailability(int screeningDatesId, String seatNumber) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select seats from ScreeningDates as screeningdates inner join screeningdates.venues.screen.seat as seats where screeningdates.screeningDatesId = :mScreeningDatesId and seats.seatNumber = :mSeatNumber";
+			Seats seat = (Seats) session.createQuery(hql)
+					.setParameter("mScreeningDatesId", screeningDatesId)
+					.setParameter("mSeatNumber", seatNumber)
+					.setLockMode(LockModeType.PESSIMISTIC_WRITE)
+					.uniqueResult();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return seat;
 		}
-
-		String hql = "select seats from ScreeningDates as screeningdates inner join screeningdates.venues.screen.seat as seats where screeningdates.screeningDatesId = :mScreeningDatesId and seats.seatNumber = :mSeatNumber";
-
-		Seats seat = (Seats) session.createQuery(hql)
-				.setParameter("mScreeningDatesId", screeningDatesId)
-				.setParameter("mSeatNumber", seatNumber)
-				.setLockMode(LockModeType.PESSIMISTIC_WRITE)
-				.uniqueResult();
-
-		return seat;
 	}
 
 	/**
 	 * Returns all movies for a given venue.
-	 *
-	 * @return
 	 */
-	public synchronized List<Movie> getMoviesForVenue(int locationId) {
+	public List<Movie> getMoviesForVenue(int locationId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select venues.screen.movie from Venues as venues where venues.location.locationId = :mLocationId";
+			List<Movie> list = session.createQuery(hql)
+					.setParameter("mLocationId", locationId)
+					.getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select venues.screen.movie from Venues as venues where venues.location.locationId = :mLocationId";
-
-		List<Movie> list = session.createQuery(hql)
-				.setParameter("mLocationId", locationId)
-				//.setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY);
-				.getResultList();
-
-		trans.commit();
-
-		return list;
 	}
 
 	/**
@@ -328,29 +256,22 @@ public class DAO {
 	/**
 	 * Returns location for a venue by locationId. It will be called from individual screens.
 	 *
-	 * @param name
+	 * @param locationId
 	 * @return
 	 */
-	public synchronized Location getlocationForVenue(int locationId) {
+	public Location getlocationForVenue(int locationId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "from Location where locationId = :mlocationId";
+			Location location = (Location) session.createQuery(hql)
+					.setParameter("mlocationId", locationId)
+					.setCacheable(true)
+					.setCacheRegion("location").uniqueResult();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return location;
 		}
-
-		String hql = "";
-
-		Location location = (Location) session.createQuery(hql)
-				.setParameter("mlocationId", locationId)
-				.setCacheable(true)
-				.setCacheRegion("location").uniqueResult();
-
-		trans.commit();
-
-		return location;
 	}
 
 	/**
@@ -359,26 +280,19 @@ public class DAO {
 	 * @param locationId
 	 * @return
 	 */
-	public synchronized List<Venues> getVenueByLocation(int locationId) {
+	public List<Venues> getVenueByLocation(int locationId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select venues from Venues as venues inner join venues.location where venues.location.locationId = :mlocationId";
+			List<Venues> venue = session.createQuery(hql)
+					.setParameter("mlocationId", locationId)
+					.setCacheable(true)
+					.setCacheRegion("venues").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return venue;
 		}
-
-		String hql = "select venues from Venues as venues inner join venues.location where venues.location.locationId = :mlocationId";
-
-		List<Venues> venue = session.createQuery(hql)
-				.setParameter("mlocationId", locationId)
-				.setCacheable(true)
-				.setCacheRegion("venues").getResultList();
-
-		trans.commit();
-
-		return venue;
 	}
 
 	/**
@@ -386,24 +300,18 @@ public class DAO {
 	 *
 	 * @return
 	 */
-	public synchronized List<Venues> getAllVenuesForUpdate() {
+	public List<Venues> getAllVenuesForUpdate() {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select venues from Venues as venues inner join venues.screen.movie";
+			List<Venues> list = session.createQuery(hql)
+					.setCacheable(true)
+					.setCacheRegion("movies").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select venues from Venues as venues inner join venues.screen.movie";
-		List<Venues> list = session.createQuery(hql)
-				.setCacheable(true)
-				.setCacheRegion("movies").getResultList();
-
-		trans.commit();
-
-		return list;
 	}
 
 	/**
@@ -411,46 +319,34 @@ public class DAO {
 	 *
 	 * @return
 	 */
-	public synchronized List<Location> getAllLocations() {
+	public List<Location> getAllLocations() {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select location from Location as location";
+			List<Location> list = session.createQuery(hql)
+					.setCacheable(true)
+					.setCacheRegion("location").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select location from Location as location";
-		List<Location> list = session.createQuery(hql)
-				.setCacheable(true)
-				.setCacheRegion("location").getResultList();
-
-		trans.commit();
-
-		return list;
 	}
 
-	public synchronized Venues getLocationForVenue(int venuesId) {
+	public Venues getLocationForVenue(int venuesId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select v from Venues v JOIN FETCH v.location where v.venuesId = :mVenuesId";
+			Venues venue = (Venues) session.createQuery(hql)
+					.setParameter("mVenuesId", venuesId)
+					.setCacheable(true)
+					.setCacheRegion("location")
+					.uniqueResult();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return venue;
 		}
-
-		String hql = "select v from Venues v JOIN FETCH v.location where v.venuesId = :mVenuesId";
-		Venues venue = (Venues) session.createQuery(hql)
-				.setParameter("mVenuesId", venuesId)
-				.setCacheable(true)
-				.setCacheRegion("location")
-				.uniqueResult();
-
-		trans.commit();
-
-		return venue;
 	}
 
 	/**
@@ -459,30 +355,19 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
-	public synchronized List<Location> getLocationForMovie(int movieId) {
+	public List<Location> getLocationForMovie(int movieId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select distinct v.location from Venues v where v.screen.movie.movieId = :movieId";
+			List<Location> location = session.createQuery(hql, Location.class)
+					.setParameter("movieId", movieId)
+					.setCacheable(true)
+					.setCacheRegion("location").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return location;
 		}
-
-		String sql = "SELECT distinct * FROM book.location join book.venues on venues.location_locationId = location.locationId join book.Screen on venues.screen_screenId = Screen.screenId join book.Movie on Screen.movie_movieId = Movie.movieId where movieId = :movieId";
-		List<Location> location = session.createNativeQuery(sql)
-				.setParameter("movieId", movieId)
-				// query.addEntity(Location.class);
-				.addEntity(Location.class)
-				.setCacheable(true)
-				.setCacheRegion("location").getResultList();
-		// criteria filters for a location, discarding all other matches for the same location,
-		// i.e. for the query; hence the criteria is the location as distinct root entity, by selecting a kind of movie
-		//query.setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY);
-
-		trans.commit();
-
-		return location;
 	}
 
 	/**
@@ -491,26 +376,19 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
-	public synchronized List<Venues> getVenuesForMovie(int movieId) {
+	public List<Venues> getVenuesForMovie(int movieId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select venues from Venues as venues inner join venues.screen.movie as movie where movie.movieId = :mMovieId";
+			List<Venues> list = session.createQuery(hql)
+					.setParameter("mMovieId", movieId)
+					.setCacheable(true)
+					.setCacheRegion("venues").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select venues from Venues as venues inner join venues.screen.movie as movie where movie.movieId = :mMovieId";
-
-		List<Venues> list = session.createQuery(hql)
-				.setParameter("mMovieId", movieId)
-				.setCacheable(true)
-				.setCacheRegion("venues").getResultList();
-
-		trans.commit();
-
-		return list;
 	}
 
 	/**
@@ -520,266 +398,18 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
-	public synchronized List<ScreeningDates> getScreeningDatesForMovieOnVenue(int locationId, int movieId) {
+	public List<ScreeningDates> getScreeningDatesForMovieOnVenue(int locationId, int movieId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select date from ScreeningDates as date inner join date.venues.location as location where date.movieId = :mMovieId and location.locationId = :mLocationId";
+			List<ScreeningDates> list = session.createQuery(hql)
+					.setParameter("mMovieId", movieId)
+					.setParameter("mLocationId", locationId).getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select date from ScreeningDates as date inner join date.venues.location as location where date.movieId = :mMovieId and location.locationId = :mLocationId";
-
-		List<ScreeningDates> list = session.createQuery(hql)
-				.setParameter("mMovieId", movieId)
-				.setParameter("mLocationId", locationId).getResultList();
-
-		trans.commit();
-
-		return list;
-	}
-
-	/**
-	 * Prepares the purchaseId for the transaction.
-	 *
-	 * @param uuid
-	 * @return
-	 */
-	public synchronized Purchase setPurchaseId(String uuid, String orderId) {
-
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
-
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-			trans.begin();
-		}
-
-		Purchase newPurchase = new Purchase();
-		newPurchase.setUuid(uuid);
-		newPurchase.setOrderId(orderId);
-		newPurchase.setTime(new Date());
-
-		session.save(newPurchase);
-
-		Purchase purchase = session.load(Purchase.class, newPurchase.getPurchaseId());
-
-		return purchase;
-	}
-
-	/**
-	 * Sets the BrainTree customerId for the transaction.
-	 *
-	 * @param uuid
-	 * @return
-	 */
-	public synchronized Purchase getBraintreeId(String uuid) {
-
-		session = factory.getCurrentSession();
-		trans = session.beginTransaction();
-
-		String hql = "SELECT p FROM Purchase p WHERE p.uuid = :uuid AND p.braintree_customerId IS NOT NULL";
-
-		List<Purchase> purchase = session.createQuery(hql)
-				.setParameter("uuid", uuid).getResultList();
-
-		session.getTransaction().commit();
-
-		if(purchase.size() > 0) {
-			return purchase.get(0);
-		} else {
-			return null;
-		}
-	}
-
-	/**
-	 * Sets the BrainTree customerId for the transaction.
-	 *
-	 * @param customerId
-	 * @param purchaseId
-	 * @return
-	 */
-	public synchronized Purchase setBraintreeId(String customerId, int purchaseId) {
-
-		session = factory.getCurrentSession();
-		trans = session.beginTransaction();
-
-		String hql = "select purchase from Purchase as purchase where purchaseId = :purchaseId";
-
-		Purchase purchase = (Purchase) session.createQuery(hql)
-				.setParameter("purchaseId", purchaseId).uniqueResult();
-		purchase.setBrainTreeId(customerId);
-		session.saveOrUpdate(purchase);
-
-		session.getTransaction().commit();
-
-		return purchase;
-	}
-
-	/**
-	 * Reserves seats for a screening, produces tickets for the purchase.
-	 *
-	 * @param screeningDateId
-	 * @param seats
-	 * @param uuid
-	 * @return
-	 */
-	@Transactional
-	public synchronized List<Ticket> bookTickets(int screeningDateId, List<String> seats, String uuid, String orderId) throws InterruptedException {
-		Purchase purchase = DAO.instance().setPurchaseId(uuid, orderId);
-		List<Ticket> tickets = new ArrayList<>();
-
-		try {
-			// Fetch and lock all seats first to prevent race conditions
-			List<Seats> seatsList = seats.stream()
-					.map(seatNum -> {
-						try {
-							return DAO.instance().getSeatForAvailability(screeningDateId, seatNum);
-						} catch (InterruptedException e) {
-							throw new RuntimeException(e);
-						}
-					})
-					.collect(Collectors.toList());
-
-			// Check if any seat is already reserved
-			boolean anySeatReserved = seatsList.stream().anyMatch(seat -> !"0".equals(seat.getIsReserved()));
-			if (anySeatReserved) {
-				throw new CustomExceptions("Booking Failed", "One or more seats are already reserved.");
-			}
-
-			// If all seats are available, proceed with booking
-			for (Seats seat : seatsList) {
-				Ticket newTicket = new Ticket();
-				newTicket.setScreen(seat.getScreen());
-				newTicket.setPrice(seat.getPrice());
-				newTicket.setTax(seat.getTax());
-				newTicket.setSeats_seatNumber(seat.getSeatNumber());
-				newTicket.setSeats_seatRow(seat.getSeatRow());
-				newTicket.setSeats(seat);
-				newTicket.setPurchase(purchase);
-
-				seat.setIsReserved("1"); // Mark seat as reserved
-
-				session.save(newTicket);
-				session.update(seat);
-
-				tickets.add(newTicket);
-			}
-
-			return tickets; // Successful booking
-
-		} catch (Exception e) {
-			// If anything fails, the transaction is automatically rolled back
-			throw new CustomExceptions("Booking Failed", "Unable to book seats: " + e.getMessage());
-		}
-	}
-
-	/*
-	public synchronized void saveTransactionId(String transactionId) {
-
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
-
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
-		}
-
-		String hql = "select max(orderId) from Purchase";
-		Query query = session.createQuery(hql);
-		@SuppressWarnings("unchecked")
-		List<Purchase> lastPurchase =  query.list();
-
-		for(int i = 0; i < lastPurchase.size(); i++) {
-
-			Purchase purchase = lastPurchase.get(i);
-			purchase.setTransactionId(transactionId);
-			session.save(purchase);
-		}
-
-		try {
-		session.getTransaction().commit();
-
-
-		} catch (Exception e) {
-
-		System.out.println(e.getLocalizedMessage());
-		session.getTransaction().rollback();
-		}
-	}
-	*/
-
-	/**
-	 * Returns the seats after the booking transaction has been completed.
-	 *
-	 * @param screeningDateId
-	 * @return
-	 */
-	public synchronized List<Seats> updatetedSeats(int screeningDateId) {
-
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
-
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
-		}
-
-		ScreeningDates date = (ScreeningDates)session.load(ScreeningDates.class, screeningDateId);
-
-		List<Seats> seats = date.getVenues().getScreen().getSeatsForScreen();
-
-		trans.commit();
-
-		return seats;
-	}
-
-	/**
-	 * Deletes individual ticket, in a purchase package, of reserved seat(s), and sets the seat free.
-	 * It is not applicable for purchases that are settled, unless void transaction is worked out.
-	 *
-	 * @param ticketIds
-	 * @param purchaseId
-	 * @return
-	 */
-	public synchronized boolean cancelTicket(List<Integer> ticketIds, Integer purchaseId){
-
-		session = factory.getCurrentSession();
-		trans = session.beginTransaction();
-
-		try {
-
-			for (int i = 0; i < ticketIds.size(); i++) {
-				Ticket tic = (Ticket)session.load(Ticket.class, ticketIds.get(i));
-				Seats seat = (Seats)session.load(Seats.class, tic.getSeats().getSeatId());
-				seat.setIsReserved("0");
-
-				session.saveOrUpdate(seat);
-				session.delete(tic);
-
-			}
-
-			Purchase pur = (Purchase)session.load(Purchase.class, purchaseId);
-			List<Ticket> tickets = pur.getTicketsForPurchase();
-
-			// remove purchase if it has no more associated ticket
-			if (tickets.size() - ticketIds.size() == 0) {
-
-				session.delete(pur);
-
-			}
-
-			session.getTransaction().commit();
-
-
-		} catch (Exception e) {
-
-			System.out.println(e.getLocalizedMessage());
-			session.getTransaction().rollback();
-			return false;
-		}
-		return true;
 	}
 
 	/**
@@ -787,75 +417,19 @@ public class DAO {
 	 *
 	 * @return
 	 */
-	public synchronized List<Purchase> getPurchases(String uuid) {
+	public List<Purchase> getPurchases(String uuid) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			String hql = "select purchase from Purchase as purchase where uuid = :uuid";
+			List<Purchase> list = session.createQuery(hql)
+					.setParameter("uuid", uuid)
+					.setCacheable(true)
+					.setCacheRegion("purchases").getResultList();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-
-			trans.begin();
+			trans.commit();
+			return list;
 		}
-
-		String hql = "select purchase from Purchase as purchase where uuid = :uuid";
-		List<Purchase> list = session.createQuery(hql)
-				.setParameter("uuid", uuid)
-				.setCacheable(true)
-				.setCacheRegion("purchases").getResultList();
-
-		trans.commit();
-
-		return list;
-
-	}
-
-	/**
-	 * Deletes purchase with associated tickets
-	 *
-	 * @param purchaseId
-	 * @return
-	 */
-	public synchronized boolean deletePurchase(Integer purchaseId) {
-
-		session = factory.getCurrentSession();
-		Transaction trans = session.beginTransaction();
-
-		Purchase pur = session.createQuery(
-				"SELECT p FROM Purchase p LEFT JOIN FETCH p.ticket t LEFT JOIN FETCH t.seats WHERE p.id = :purchaseId",
-				Purchase.class
-		).setParameter("purchaseId", purchaseId).getSingleResult();
-
-		List<Ticket> ticketIds = pur.getTicketsForPurchase();
-
-		int batchSize = 20;
-		for (int i = 0; i < ticketIds.size(); i++) {
-			Ticket tic = ticketIds.get(i);
-			Seats seat = tic.getSeats();
-			seat.setIsReserved("0");
-
-			session.saveOrUpdate(seat);
-			//	session.delete(tic);
-
-			if (i % batchSize == 0) {
-				session.flush();
-				session.clear();
-			}
-		}
-
-		// Bulk delete all tickets for the purchase
-		//	session.createQuery("DELETE FROM Ticket t WHERE t.purchase_purchaseId = :purchaseId")
-		//			.setParameter("purchaseId", purchaseId)
-		//			.executeUpdate();
-
-		// Delete the purchase itself
-		session.createQuery("DELETE FROM Purchase WHERE purchaseId = :purchaseId")
-				.setParameter("purchaseId", purchaseId)
-				.executeUpdate();
-
-		//	session.delete(pur);
-		trans.commit();
-
-		return true;
 	}
 
 	/**
@@ -866,51 +440,266 @@ public class DAO {
 	 * @return
 	 */
 	public List<Ticket> getTicketPerPurchase(int purchaseId) {
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-			trans.begin();
+			String hql = "SELECT t FROM Ticket t "
+					+ "JOIN FETCH t.screen s "
+					+ "JOIN FETCH s.movie m "
+					+ "JOIN FETCH s.screeningDates sd "
+					+ "JOIN FETCH sd.venues v "
+					+ "WHERE t.purchase.purchaseId = :purchaseId";
+
+			List<Ticket> list = session.createQuery(hql, Ticket.class)
+					.setParameter("purchaseId", purchaseId)
+					.setCacheable(true)
+					.getResultList();
+
+			trans.commit();
+			return list;
 		}
+	}
 
-		String hql = "SELECT t FROM Ticket t "
-				+ "JOIN FETCH t.screen s "
-				+ "JOIN FETCH s.movie m "
-				+ "JOIN FETCH s.screeningDates sd "
-				+ "JOIN FETCH sd.venues v "
-				+ "WHERE t.purchase.purchaseId = :purchaseId";
+	// ────────────────────────────────────────────────────────
+	//  Write methods — synchronized to serialise mutations
+	// ────────────────────────────────────────────────────────
 
-		List<Ticket> list = session.createQuery(hql, Ticket.class)
-				.setParameter("purchaseId", purchaseId)
-				.setCacheable(true) // Enable second-level cache
-				.getResultList();
+	/**
+	 * Prepares the purchaseId for the transaction.
+	 */
+	public synchronized Purchase setPurchaseId(String uuid, String orderId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		trans.commit();
-		return list;
+			Purchase newPurchase = new Purchase();
+			newPurchase.setUuid(uuid);
+			newPurchase.setOrderId(orderId);
+			newPurchase.setTime(new Date());
+
+			session.save(newPurchase);
+			session.flush();
+
+			// Reload to ensure ID is populated
+			Purchase purchase = session.get(Purchase.class, newPurchase.getPurchaseId());
+
+			trans.commit();
+			return purchase;
+		}
+	}
+
+	/**
+	 * Sets the BrainTree customerId.
+	 */
+	public synchronized Purchase getBraintreeId(String uuid) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			String hql = "SELECT p FROM Purchase p WHERE p.uuid = :uuid AND p.braintree_customerId IS NOT NULL";
+			List<Purchase> purchase = session.createQuery(hql)
+					.setParameter("uuid", uuid).getResultList();
+
+			trans.commit();
+
+			if (purchase.size() > 0) {
+				return purchase.get(0);
+			} else {
+				return null;
+			}
+		}
+	}
+
+	/**
+	 * Sets the BrainTree customerId for the transaction.
+	 */
+	public synchronized Purchase setBraintreeId(String customerId, int purchaseId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			String hql = "select purchase from Purchase as purchase where purchaseId = :purchaseId";
+			Purchase purchase = (Purchase) session.createQuery(hql)
+					.setParameter("purchaseId", purchaseId).uniqueResult();
+			purchase.setBrainTreeId(customerId);
+			session.saveOrUpdate(purchase);
+
+			trans.commit();
+			return purchase;
+		}
+	}
+
+	/**
+	 * Reserves seats for a screening, produces tickets for the purchase.
+	 */
+	@Transactional
+	public synchronized List<Ticket> bookTickets(int screeningDateId, List<String> seats, String uuid, String orderId) throws InterruptedException {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			// Create purchase
+			Purchase purchase = new Purchase();
+			purchase.setUuid(uuid);
+			purchase.setOrderId(orderId);
+			purchase.setTime(new Date());
+			session.save(purchase);
+			session.flush();
+
+			List<Ticket> tickets = new ArrayList<>();
+
+			try {
+				// Fetch and lock all seats
+				List<Seats> seatsList = new ArrayList<>();
+				for (String seatNum : seats) {
+					String hql = "select s from ScreeningDates as sd inner join sd.venues.screen.seat as s where sd.screeningDatesId = :mScreeningDatesId and s.seatNumber = :mSeatNumber";
+					Seats seat = (Seats) session.createQuery(hql)
+							.setParameter("mScreeningDatesId", screeningDateId)
+							.setParameter("mSeatNumber", seatNum)
+							.setLockMode(LockModeType.PESSIMISTIC_WRITE)
+							.uniqueResult();
+					seatsList.add(seat);
+				}
+
+				// Check if any seat is already reserved
+				boolean anySeatReserved = seatsList.stream().anyMatch(seat -> !"0".equals(seat.getIsReserved()));
+				if (anySeatReserved) {
+					trans.rollback();
+					throw new CustomExceptions("Booking Failed", "One or more seats are already reserved.");
+				}
+
+				// If all seats are available, proceed with booking
+				for (Seats seat : seatsList) {
+					Ticket newTicket = new Ticket();
+					newTicket.setScreen(seat.getScreen());
+					newTicket.setPrice(seat.getPrice());
+					newTicket.setTax(seat.getTax());
+					newTicket.setSeats_seatNumber(seat.getSeatNumber());
+					newTicket.setSeats_seatRow(seat.getSeatRow());
+					newTicket.setSeats(seat);
+					newTicket.setPurchase(purchase);
+
+					seat.setIsReserved("1");
+
+					session.save(newTicket);
+					session.update(seat);
+
+					tickets.add(newTicket);
+				}
+
+				trans.commit();
+				return tickets;
+
+			} catch (CustomExceptions e) {
+				throw e;
+			} catch (Exception e) {
+				if (trans.isActive()) trans.rollback();
+				throw new CustomExceptions("Booking Failed", "Unable to book seats: " + e.getMessage());
+			}
+		}
+	}
+
+	/**
+	 * Returns the seats after the booking transaction has been completed.
+	 */
+	public List<Seats> updatetedSeats(int screeningDateId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			ScreeningDates date = session.get(ScreeningDates.class, screeningDateId);
+			List<Seats> seats = date.getVenues().getScreen().getSeatsForScreen();
+			// Force initialisation while session is open
+			seats.size();
+
+			trans.commit();
+			return seats;
+		}
+	}
+
+	/**
+	 * Deletes individual ticket and sets the seat free.
+	 */
+	public synchronized boolean cancelTicket(List<Integer> ticketIds, Integer purchaseId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			try {
+				for (int i = 0; i < ticketIds.size(); i++) {
+					Ticket tic = session.load(Ticket.class, ticketIds.get(i));
+					Seats seat = session.load(Seats.class, tic.getSeats().getSeatId());
+					seat.setIsReserved("0");
+
+					session.saveOrUpdate(seat);
+					session.delete(tic);
+				}
+
+				Purchase pur = session.load(Purchase.class, purchaseId);
+				List<Ticket> tickets = pur.getTicketsForPurchase();
+
+				if (tickets.size() - ticketIds.size() == 0) {
+					session.delete(pur);
+				}
+
+				trans.commit();
+
+			} catch (Exception e) {
+				System.out.println(e.getLocalizedMessage());
+				if (trans.isActive()) trans.rollback();
+				return false;
+			}
+			return true;
+		}
+	}
+
+	/**
+	 * Deletes purchase with associated tickets.
+	 */
+	public synchronized boolean deletePurchase(Integer purchaseId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			Purchase pur = session.createQuery(
+					"SELECT p FROM Purchase p LEFT JOIN FETCH p.ticket t LEFT JOIN FETCH t.seats WHERE p.id = :purchaseId",
+					Purchase.class
+			).setParameter("purchaseId", purchaseId).getSingleResult();
+
+			List<Ticket> ticketIds = pur.getTicketsForPurchase();
+
+			int batchSize = 20;
+			for (int i = 0; i < ticketIds.size(); i++) {
+				Ticket tic = ticketIds.get(i);
+				Seats seat = tic.getSeats();
+				seat.setIsReserved("0");
+
+				session.saveOrUpdate(seat);
+
+				if (i % batchSize == 0) {
+					session.flush();
+					session.clear();
+				}
+			}
+
+			session.createQuery("DELETE FROM Purchase WHERE purchaseId = :purchaseId")
+					.setParameter("purchaseId", purchaseId)
+					.executeUpdate();
+
+			trans.commit();
+			return true;
+		}
 	}
 
 	//TODO: add controller and admin user in iOS
-	public boolean deleteScreen(int screeningDateId) {
+	public synchronized boolean deleteScreen(int screeningDateId) {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			ScreeningDates date = session.get(ScreeningDates.class, screeningDateId);
+			session.delete(date);
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
-			trans.begin();
+			try {
+				trans.commit();
+				return true;
+			} catch (Exception e) {
+				if (trans.isActive()) trans.rollback();
+				return false;
+			}
 		}
-
-		ScreeningDates date = session.get(ScreeningDates.class, screeningDateId);
-		session.delete(date);
-
-		try {
-			// save to dB
-			session.getTransaction().commit();
-			return true;
-		} catch (Exception e) {
-			session.getTransaction().rollback();
-			return false;
-		}
-
 	}
 
 	public synchronized Screen getScreenForAvailability(String movie, String date, String venue,
@@ -919,7 +708,7 @@ public class DAO {
 
 		Transaction transaction = null;
 
-		try (Session session = factory.getCurrentSession()) {
+		try (Session session = factory.openSession()) {
 			transaction = session.beginTransaction();
 
 			// Fetch Location entity
@@ -995,7 +784,7 @@ public class DAO {
 		}
 	}
 
-	public Screen insertNewScreen(String movie, String date, String venue, int nrOfRows, int nrOfSeatsInRow, String screeningId, String category) throws HibernateException, ParseException {
+	public synchronized Screen insertNewScreen(String movie, String date, String venue, int nrOfRows, int nrOfSeatsInRow, String screeningId, String category) throws HibernateException, ParseException {
 		Transaction transaction = null;
 		Screen screen = null;
 
@@ -1005,10 +794,10 @@ public class DAO {
 			// Step 1: Get or create the screen
 			screen = DAO.instance().getScreenForAvailability(movie, date, venue, screeningId, category);
 
-			// 🚨 Flush to ensure the screen gets an ID before creating seats
+			// Flush to ensure the screen gets an ID before creating seats
 			session.saveOrUpdate(screen);
 			session.flush();
-			session.refresh(screen); // Refresh to make sure the ID is available
+			session.refresh(screen);
 
 			if (screen.getScreenId() == null) {
 				throw new HibernateException("Screen ID is null after save. Something went wrong.");
@@ -1028,7 +817,7 @@ public class DAO {
 					Seats seat = new Seats();
 					seat.setSeatId(newSeatId++);
 					seat.setIsReserved("0");
-					seat.setScreen(screen);  // 🚨 Ensure the screen reference is set
+					seat.setScreen(screen);
 					seat.setSeatNumber(alphabet[i] + j);
 					seat.setSeatRow(String.valueOf(i + 1));
 					seat.setPrice(3);
@@ -1048,7 +837,7 @@ public class DAO {
 			transaction.commit();
 
 		} catch (Exception e) {
-			if (transaction != null) transaction.rollback();
+			if (transaction != null && transaction.isActive()) transaction.rollback();
 			e.printStackTrace();
 			return null;
 		}
@@ -1063,55 +852,47 @@ public class DAO {
 		return errorScreen;
 	}
 
-	public  Screen updateScreen(String Venue, int venuesId, int screeningDatesId, int moviesId, String screenId, String Date, String category) throws ParseException {
+	public synchronized Screen updateScreen(String Venue, int venuesId, int screeningDatesId, int moviesId, String screenId, String Date, String category) throws ParseException {
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
 
-		session = factory.getCurrentSession();
-		trans = session.getTransaction();
+			// change venue i.e. cinema location
+			String hql = "from Location where name = :mLocationName";
+			Location location = (Location) session.createQuery(hql)
+					.setParameter("mLocationName", Venue).uniqueResult();
 
-		if (trans.getStatus() != TransactionStatus.ACTIVE) {
+			// keep original venuesId
+			Venues venue_ = session.get(Venues.class, venuesId);
 
-			trans.begin();
+			// do the change here
+			venue_.setLocation(location);
+			venue_.setName(location.getName());
+			venue_.setAddress(location.getFormatted_address());
+			venue_.setVenues_picture(location.getThumbnail());
+			venue_.setContact("Quentin Tarantino");
+			session.saveOrUpdate(venue_);
+
+			// change date
+			ScreeningDates dates = session.get(ScreeningDates.class, screeningDatesId);
+			dates.setScreeningDate(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+					.parse(Date));
+			session.saveOrUpdate(dates);
+
+			// change date and movie for the venuesId
+			Screen screen = session.get(Screen.class, screenId);
+			Movie movie = session.get(Movie.class, moviesId);
+			movie.setCategory(category);
+			screen.setMovie(session.get(Movie.class, moviesId));
+			session.saveOrUpdate(movie);
+			session.saveOrUpdate(screen);
+
+			try {
+				trans.commit();
+			} catch (Exception e) {
+				if (trans.isActive()) trans.rollback();
+			}
+
+			return screen;
 		}
-
-		// change venue i.e. cinema location
-		String hql = "from Location where name = :mLocationName";
-		Location location = (Location) session.createQuery(hql)
-				.setParameter("mLocationName", Venue).uniqueResult();
-
-		// keep original venuesId
-		Venues venue_ = session.get(Venues.class, venuesId);
-
-		// do the change here
-		venue_.setLocation(location);
-		venue_.setName(location.getName());
-		venue_.setAddress(location.getFormatted_address());
-		venue_.setVenues_picture(location.getThumbnail());
-		venue_.setContact("Quentin Tarantino");
-		session.saveOrUpdate(venue_);
-
-		// change date
-		ScreeningDates dates = session.get(ScreeningDates.class, screeningDatesId);
-		dates.setScreeningDate(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-				.parse(Date));
-		session.saveOrUpdate(dates);
-
-		// change date and movie for the venuesId
-		Screen screen = session.get(Screen.class, screenId);
-		Movie movie = session.get(Movie.class, moviesId);
-		movie.setCategory(category);
-		screen.setMovie(session.get(Movie.class, moviesId));
-		session.saveOrUpdate(movie);
-		session.saveOrUpdate(screen);
-
-
-
-		try {
-			// save to dB
-			session.getTransaction().commit();
-		} catch (Exception e) {
-			session.getTransaction().rollback();
-		}
-
-		return screen;
 	}
 }
