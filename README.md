@@ -5,8 +5,8 @@ Movie catalog, seat booking, and payment API for the Cinemas booking platform. R
 ## What it does
 
 - **Movie catalog** — Browse all movies (`GET /rest/book/movies`), search by name or full-text, filter by category.
-- **Venue & screening lookup** — `GET /rest/book/venues/{movieId}` returns venues, screens, and screening dates for a movie.
-- **Seat selection** — `GET /rest/book/seats/{screenId}` returns the seat map with reservation status.
+- **Venue & screening lookup** — `GET /rest/book/venue/v2/{movieId}` and `GET /rest/book/dates/{locationId}/{movieId}` for the web/iOS booking flow.
+- **Seat selection** — `GET /rest/book/seats/{screeningDateId}` returns the seat map with reservation status.
 - **Booking & payment** — `POST /rest/book/payment/fullcheckout2` reserves seats with pessimistic locking, processes payment via Braintree (sandbox), records the purchase.
 - **Purchase history** — `GET /rest/book/purchases` lists all purchases for a user; `/purchases/tickets?purchaseId=` returns ticket details.
 - **Ticket management** — Cancel tickets or delete purchases via `/purchases/manage` and `/purchases/delete`.
@@ -40,8 +40,10 @@ mbooks (:8080, /mbooks-1)
 | `/rest/book/movies/{name}/{order}` | GET | Search movies by name |
 | `/rest/book/movies/search?match=&category=` | GET | Full-text search |
 | `/rest/book/movie/{movieId}` | GET | Single movie details |
-| `/rest/book/venues/{movieId}` | GET | Venues + screenings for a movie |
-| `/rest/book/seats/{screenId}` | GET | Seat map for a screen |
+| `/rest/book/venue/{movieId}` | GET | Legacy venues endpoint |
+| `/rest/book/venue/v2/{movieId}` | GET | Venues for movie (web/iOS flow) |
+| `/rest/book/dates/{locationId}/{movieId}` | GET | Screening dates for venue + movie |
+| `/rest/book/seats/{screeningDateId}` | GET | Seat map for a screening date |
 | `/rest/book/payment/clientToken` | GET | Generate Braintree client token |
 | `/rest/book/payment/fullcheckout2` | POST | Reserve seats + process Braintree payment |
 | `/rest/book/payment/webcheckout` | POST | Web-only checkout |
@@ -49,6 +51,11 @@ mbooks (:8080, /mbooks-1)
 | `/rest/book/purchases/tickets?purchaseId=` | GET | Tickets for a purchase |
 | `/rest/book/purchases/manage` | POST | Cancel tickets |
 | `/rest/book/purchases/delete` | DELETE | Delete a purchase |
+
+## Web UI contract note
+
+- AngularJS route/state (`#/login` -> `#/movies` -> booking flow) is owned by `dalogin-quarkus` frontend code.
+- `mbooks` remains request-driven/stateless for booking calls; it does not track UI step state.
 
 ## Database
 
