@@ -45,3 +45,5 @@ nb-configuration.xml
 .certs/
 
 docker
+logs
+*.log
