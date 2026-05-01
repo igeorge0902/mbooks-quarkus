@@ -4,6 +4,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.jeet.api.TrendingMovieRow;
 import com.jeet.api.Location;
 import com.jeet.api.Movie;
 import com.jeet.api.Purchase;
@@ -20,8 +21,18 @@ import jakarta.inject.Named;
 
 @RequestScoped
 public class BookingHandlerImpl {
-	
-	
+
+	/**
+	 * Returns trending movies ranked by booked ticket count for the given time window.
+	 *
+	 * @param days  look-back window in days (>= 1)
+	 * @param limit max rows (1..50)
+	 * @return ordered list of TrendingMovieRow
+	 */
+	public List<TrendingMovieRow> getTrendingMovies(int days, int limit) throws InterruptedException {
+		return DAO.instance().getTrendingMovies(days, limit);
+	}
+
 	public List<Ticket> returnTickets(int screeningDateId, List<String> seats, String uuid, String orderId) throws InterruptedException {
 		
 		List<Ticket> tickets = DAO.instance().bookTickets(screeningDateId, seats, uuid, orderId);

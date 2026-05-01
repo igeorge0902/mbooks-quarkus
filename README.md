@@ -5,6 +5,7 @@ Movie catalog, seat booking, and payment API for the Cinemas booking platform. R
 ## What it does
 
 - **Movie catalog** — Browse all movies (`GET /rest/book/movies`), search by name or full-text, filter by category.
+- **Trending movies** — `GET /rest/book/trending-movies` returns movies ranked by booked ticket count over a configurable time window (see below).
 - **Venue & screening lookup** — `GET /rest/book/venue/v2/{movieId}` and `GET /rest/book/dates/{locationId}/{movieId}` for the web/iOS booking flow.
 - **Seat selection** — `GET /rest/book/seats/{screeningDateId}` returns the seat map with reservation status.
 - **Booking & payment** — `POST /rest/book/payment/fullcheckout2` reserves seats with pessimistic locking, processes payment via Braintree (sandbox), records the purchase.
@@ -88,6 +89,61 @@ podman build -t mbooks-quarkus:local .
 ```
 
 ## Part of the Cinemas platform
+
+## Trending Movies endpoint
+
+`GET /rest/book/trending-movies`
+
+Returns the most-booked movies ranked by ticket count for a configurable time window. No extra authentication required (matches public movie-list read behavior).
+
+### Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `days` | integer | `30` | Look-back window in days (>= 1). The window extends back to the earliest booking record when the requested range predates all data. |
+| `limit` | integer | `10` | Maximum number of results returned (1..50). |
+
+### Response
+
+```json
+{
+  "trendingMovies": [
+    {
+      "movieId": 1,
+      "name": "Interstellar",
+      "thumbnail_picture": "/images/interstellar_thumb.jpg",
+      "large_picture": "/images/interstellar_large.jpg",
+      "bookedTickets": 42,
+      "lastBookingTime": "2026-04-28T19:30:00.000+0000"
+    }
+  ]
+}
+```
+
+Empty window returns `{"trendingMovies": []}`.
+
+### Error responses
+
+| Code | reason |
+|------|--------|
+| `400` | `days < 1` or `limit` out of 1..50 range |
+| `500` | Unexpected backend failure |
+
+### curl examples
+
+```bash
+# Default window (30 days, 10 results)
+curl -s "https://milo.crabdance.com/mbooks-1/rest/book/trending-movies" | jq .
+
+# Last 7 days, top 5
+curl -s "https://milo.crabdance.com/mbooks-1/rest/book/trending-movies?days=7&limit=5" | jq .
+
+# All-time top 20
+curl -s "https://milo.crabdance.com/mbooks-1/rest/book/trending-movies?days=99999&limit=20" | jq .
+
+# Invalid limit — expect 400
+curl -sv "https://milo.crabdance.com/mbooks-1/rest/book/trending-movies?limit=0" 2>&1 | tail -5
+```
 
 | Service | Repo | Role |
 |---------|------|------|

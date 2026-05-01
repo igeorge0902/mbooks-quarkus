@@ -1,5 +1,6 @@
 package com.jeet.rest;
 
+import com.jeet.api.TrendingMovieRow;
 import com.braintreegateway.*;
 import com.jeet.api.*;
 import com.jeet.booking.PaymentService;
@@ -105,7 +106,67 @@ public class BookController implements Serializable {
 		json.put("greeting", "hello");
 		return Response.ok().entity(json.toString()).type(MediaType.APPLICATION_JSON).build();
 	}
-    
+
+	/**
+	 * GET /rest/book/trending-movies
+	 *
+	 * Returns the most-booked movies ranked by ticket count within the given window.
+	 * No extra auth gate — matches public movie-list read behaviour.
+	 *
+	 * @param days  (optional, default 30) look-back window in days, any integer >= 1
+	 * @param limit (optional, default 10) max results, 1..50
+	 */
+	@GET
+	@Path("/book/trending-movies")
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response getTrendingMovies(
+			@QueryParam("days") @DefaultValue("30") int days,
+			@QueryParam("limit") @DefaultValue("10") int limit) {
+
+		// --- REQ-TM-5 Validation ---
+		if (days < 1) {
+			JSONObject err = new JSONObject();
+			err.put("error", "INVALID_PARAM");
+			err.put("message", "Parameter 'days' must be >= 1.");
+			return Response.status(Status.BAD_REQUEST).entity(err.toString()).type(MediaType.APPLICATION_JSON).build();
+		}
+		if (limit < 1 || limit > 50) {
+			JSONObject err = new JSONObject();
+			err.put("error", "INVALID_PARAM");
+			err.put("message", "Parameter 'limit' must be between 1 and 50.");
+			return Response.status(Status.BAD_REQUEST).entity(err.toString()).type(MediaType.APPLICATION_JSON).build();
+		}
+
+		try {
+			List<TrendingMovieRow> rows = bookingHandler.getTrendingMovies(days, limit);
+
+			JSONArray arr = new JSONArray();
+			for (TrendingMovieRow row : rows) {
+				JSONObject item = new JSONObject();
+				item.put("movieId", row.getMovieId());
+				item.put("name", row.getName());
+				item.put("thumbnail_picture", row.getThumbnail_picture() != null ? row.getThumbnail_picture() : "");
+				item.put("large_picture", row.getLarge_picture() != null ? row.getLarge_picture() : "");
+				item.put("bookedTickets", row.getBookedTickets());
+				item.put("lastBookingTime", row.getLastBookingTime() != null ? row.getLastBookingTime() : JSONObject.NULL);
+				arr.put(item);
+			}
+
+			JSONObject response = new JSONObject();
+			response.put("trendingMovies", arr);
+
+			java.util.logging.Logger.getLogger(BookController.class.getName()).info(
+					"trending-movies: days=" + days + " limit=" + limit + " resultSize=" + rows.size());
+
+			return Response.ok().entity(response.toString()).type(MediaType.APPLICATION_JSON).build();
+
+		} catch (Exception e) {
+			return Response.serverError()
+					.entity("{\"error\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred.\"}")
+					.type(MediaType.APPLICATION_JSON).build();
+		}
+	}
+
     /**
      * The user completes the checkout: the user needs to have a customer, therefore create a new CustomerRequest, if necessary.
      * Unless the card is not valid, the booking takes places, and the order will be recorded with purchase and payment details, that 
