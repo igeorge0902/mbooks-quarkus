@@ -201,6 +201,43 @@ public class DAO {
 	}
 
 	/**
+	 * Returns a paged list of movies matching a full-text search and optional category.
+	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)
+	public List<Movie> fullTextSearchMovies(String match, String category, int setFirstResult) {
+		long _start = System.currentTimeMillis();
+		DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.fullTextSearchMovies", "START", null,
+				java.util.Map.of("match", match, "category", category == null ? "" : category, "setFirstResult", setFirstResult));
+		try (Session session = factory.openSession()) {
+			Transaction trans = session.beginTransaction();
+
+			String hql = "from Movie m where lower(m.name) like :match";
+			if (category != null && !category.isBlank()) {
+				hql += " and m.category = :mCategory";
+			}
+			hql += " order by m.name asc";
+
+			var query = session.createQuery(hql, Movie.class)
+					.setCacheable(true)
+					.setCacheRegion("movies")
+					.setCacheMode(CacheMode.NORMAL)
+					.setFirstResult(Math.max(0, setFirstResult))
+					.setMaxResults(30)
+					.setParameter("match", "%" + match.toLowerCase() + "%");
+
+			if (category != null && !category.isBlank()) {
+				query.setParameter("mCategory", category);
+			}
+
+			List<Movie> movies = query.getResultList();
+			trans.commit();
+			DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.fullTextSearchMovies", "END", null,
+					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", movies.size()));
+			return movies;
+		}
+	}
+
+	/**
 	 * Returns all seats for a screen (movie/venue) by screeningDateId.
 	 */
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)

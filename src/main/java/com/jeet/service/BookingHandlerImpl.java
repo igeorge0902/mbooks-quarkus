@@ -247,10 +247,7 @@ public class BookingHandlerImpl {
 	
 
 	public List<Movie> fullTextSearchMovies(String match, String category, int setFirstResult) throws InterruptedException {
-		
-		List<Movie> movie = null;
-
-		return movie;	
+		return DAO.instance().fullTextSearchMovies(match, category, setFirstResult);
 	}
 
 	
