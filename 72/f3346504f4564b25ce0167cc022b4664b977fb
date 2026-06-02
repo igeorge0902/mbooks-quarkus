@@ -1,0 +1,50 @@
+src/main/java/com/jeet/logging/DAOLogger.java
+  s_3dc167fb898cb2::t_ee74988223e1d5 4,6-7,9-11,13-17,19
+src/main/java/com/jeet/service/BookingHandlerImpl.java
+  s_3dc167fb898cb2::t_6999c7f962745a 274-275
+  s_3dc167fb898cb2::t_2252a3d909095c 19,24-26,35,40-41,65-66,88,95,102,109,128-129,135,143,166,187,210,230,252,260,282-283,289,296,303-304,310-311,317-318,324-325,331,338
+src/main/java/com/jeet/db/DAO.java
+  s_3dc167fb898cb2::t_76f74ac63c1928 547
+  s_3dc167fb898cb2::t_6a02c3a73d7e3b 475
+  s_3dc167fb898cb2::t_5773bbb7a91994 736
+  s_3dc167fb898cb2::t_b7c04f984186cc 329
+  s_3dc167fb898cb2::t_1fa5fbf421d1e6 407
+  s_3dc167fb898cb2::t_9b026abe9be0a0 452
+  s_3dc167fb898cb2::t_a9e961e11bcb3a 571
+  s_3dc167fb898cb2::t_d0d3f838ffffca 593
+  s_3dc167fb898cb2::t_5b7d8171191d58 351
+  s_3dc167fb898cb2::t_43a5a0f88c0732 430
+  s_3dc167fb898cb2::t_bd40bb6273e46f 682
+  s_3dc167fb898cb2::t_1933297cecf007 7,22,30
+  s_3dc167fb898cb2::t_8f119234fd7fc7 518
+  s_3dc167fb898cb2::t_ba835d32d2a9a3 873
+  s_3dc167fb898cb2::t_d776ee6cd2f152 882
+  s_3dc167fb898cb2::t_15561aa4950275 372
+  s_3dc167fb898cb2::t_739362a9696a8f 220
+  s_3dc167fb898cb2::t_0727ec06da156a 240
+  s_3dc167fb898cb2::t_9a74c4f0eb9670 790
+  s_3dc167fb898cb2::t_c8a1aa4d4d46f4 700
+  s_3dc167fb898cb2::t_bc0272606b0369 772
+  s_3dc167fb898cb2::t_b41af461d4acb8 942
+  s_3dc167fb898cb2::t_2c0a6014fbd255 495
+src/main/java/com/jeet/rest/BookController.java
+  s_3dc167fb898cb2::t_37e21b1f163ead 331,504,603,656,692,714,777,817,856,896,938,960
+src/main/resources/application.properties
+  s_3dc167fb898cb2::t_334475ad0e91f3 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "72f3346504f4564b25ce0167cc022b4664b977fb",
+  "prompts": {},
+  "sessions": {
+    "s_3dc167fb898cb2": {
+      "agent_id": {
+        "tool": "github-copilot-jetbrains",
+        "id": "1780408617808",
+        "model": "unknown"
+      },
+      "human_author": "GASPAR, GYORGY <gyorgy.gaspar@lhsystems.com>"
+    }
+  }
+}
