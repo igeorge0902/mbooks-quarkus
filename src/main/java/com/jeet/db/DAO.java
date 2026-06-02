@@ -1,11 +1,10 @@
 package com.jeet.db;
 
 import com.jeet.api.*;
-import com.jeet.logging.DAOLogger;
 import com.jeet.logging.LogLevel;
 import com.jeet.logging.ObservedLog;
 import com.jeet.utils.CustomExceptions;
-import jakarta.enterprise.context.Dependent;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.FlushModeType;
 import jakarta.persistence.LockModeType;
 import jakarta.transaction.Transactional;
@@ -18,43 +17,25 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-@Dependent
+@ApplicationScoped
 public class DAO {
 
-	private static DAO instance;
 	private final SessionFactory factory;
-	private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
 	/**
 	 * Instantiate DAO class that loads configured SessionFactory object.
 	 */
-	public DAO() throws InterruptedException {
+	public DAO() {
 
 		factory = HibernateUtil.getSessionFactory();
-		System.out.println("Creating factory");
 
 		Statistics stats = factory.getStatistics();
 		stats.setStatisticsEnabled(true);
 
 		// clear cache
 		factory.getCache().evictAllRegions();
-		System.out.println("Cache cleared.");
-	}
-
-	/**
-	 * DAO instance — synchronized only for singleton initialisation.
-	 *
-	 * @return DAO instance
-	 */
-	public synchronized static DAO instance() throws InterruptedException {
-		if (instance == null) {
-			instance = new DAO();
-		}
-		return instance;
 	}
 
 	// ────────────────────────────────────────────────────────
@@ -66,15 +47,10 @@ public class DAO {
 	 */
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public Movie getMovie(int movieId) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getMovie", "START", null,
-				java.util.Map.of("movieId", movieId));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 			Movie movie = session.get(Movie.class, movieId);
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getMovie", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "found", movie != null));
 			return movie;
 		}
 	}
@@ -91,9 +67,6 @@ public class DAO {
 	@SuppressWarnings("unchecked")
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<com.jeet.api.TrendingMovieRow> getTrendingMovies(int days, int limit) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getTrendingMovies", "START", null,
-				java.util.Map.of("days", days, "limit", limit));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -123,9 +96,6 @@ public class DAO {
 					.getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getTrendingMovies", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start,
-							"days", days, "limit", limit, "resultSize", rows.size()));
 			return rows;
 		}
 	}
@@ -136,9 +106,6 @@ public class DAO {
 	@SuppressWarnings("unchecked")
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Movie> getAllMovies(int setFirstResult, String category) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getAllMovies", "START", null,
-				java.util.Map.of("setFirstResult", setFirstResult, "category", category == null ? "" : category));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -176,8 +143,6 @@ public class DAO {
 			}
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getAllMovies", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", movies.size()));
 			return movies;
 		}
 	}
@@ -205,9 +170,6 @@ public class DAO {
 	 */
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)
 	public List<Movie> fullTextSearchMovies(String match, String category, int setFirstResult) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.fullTextSearchMovies", "START", null,
-				java.util.Map.of("match", match, "category", category == null ? "" : category, "setFirstResult", setFirstResult));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -231,8 +193,6 @@ public class DAO {
 
 			List<Movie> movies = query.getResultList();
 			trans.commit();
-			DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.fullTextSearchMovies", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", movies.size()));
 			return movies;
 		}
 	}
@@ -242,9 +202,6 @@ public class DAO {
 	 */
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)
 	public List<Seats> getSeatsForScreening(int screeningDateId) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.getSeatsForScreening", "START", null,
-				java.util.Map.of("screeningDateId", screeningDateId));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -253,8 +210,6 @@ public class DAO {
 					.setParameter("mScreeningDatesId", screeningDateId).getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.DEBUG, "LOG-ENTITY", "DAO.getSeatsForScreening", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", list.size()));
 			return list;
 		}
 	}
@@ -262,6 +217,7 @@ public class DAO {
 	/**
 	 * Returns seats state (availability).
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)
 	public synchronized Seats getSeatForAvailability(int screeningDatesId, String seatNumber) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -281,6 +237,7 @@ public class DAO {
 	/**
 	 * Returns all movies for a given venue.
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Movie> getMoviesForVenue(int locationId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -369,6 +326,7 @@ public class DAO {
 	 * @param locationId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public Location getlocationForVenue(int locationId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -390,6 +348,7 @@ public class DAO {
 	 * @param locationId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Venues> getVenueByLocation(int locationId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -410,6 +369,7 @@ public class DAO {
 	 *
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Venues> getAllVenuesForUpdate() {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -431,8 +391,6 @@ public class DAO {
 	 */
 	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Location> getAllLocations() {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getAllLocations", "START", null, null);
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -442,12 +400,11 @@ public class DAO {
 					.setCacheRegion("location").getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getAllLocations", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", list.size()));
 			return list;
 		}
 	}
 
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public Venues getLocationForVenue(int venuesId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -470,6 +427,7 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Location> getLocationForMovie(int movieId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -491,6 +449,7 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Venues> getVenuesForMovie(int movieId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -513,10 +472,8 @@ public class DAO {
 	 * @param movieId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<ScreeningDates> getScreeningDatesForMovieOnVenue(int locationId, int movieId) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getScreeningDatesForMovieOnVenue", "START", null,
-				java.util.Map.of("locationId", locationId, "movieId", movieId));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -526,8 +483,6 @@ public class DAO {
 					.setParameter("mLocationId", locationId).getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getScreeningDatesForMovieOnVenue", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", list.size()));
 			return list;
 		}
 	}
@@ -537,9 +492,8 @@ public class DAO {
 	 *
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Purchase> getPurchases(String uuid) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getPurchases", "START", null, null);
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -550,8 +504,6 @@ public class DAO {
 					.setCacheRegion("purchases").getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getPurchases", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", list.size()));
 			return list;
 		}
 	}
@@ -563,10 +515,8 @@ public class DAO {
 	 * @param seatId
 	 * @return
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.INFO)
 	public List<Ticket> getTicketPerPurchase(int purchaseId) {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getTicketPerPurchase", "START", null,
-				java.util.Map.of("purchaseId", purchaseId));
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -583,8 +533,6 @@ public class DAO {
 					.getResultList();
 
 			trans.commit();
-			DAOLogger.log(LogLevel.INFO, "LOG-ENTITY", "DAO.getTicketPerPurchase", "END", null,
-					java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "size", list.size()));
 			return list;
 		}
 	}
@@ -596,6 +544,7 @@ public class DAO {
 	/**
 	 * Prepares the purchaseId for the transaction.
 	 */
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized Purchase setPurchaseId(String uuid, String orderId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -619,6 +568,7 @@ public class DAO {
 	/**
 	 * Sets the BrainTree customerId.
 	 */
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.DEBUG)
 	public synchronized Purchase getBraintreeId(String uuid) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -640,6 +590,7 @@ public class DAO {
 	/**
 	 * Sets the BrainTree customerId for the transaction.
 	 */
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized Purchase setBraintreeId(String customerId, int purchaseId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -661,8 +612,6 @@ public class DAO {
 	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	@Transactional
 	public synchronized List<Ticket> bookTickets(int screeningDateId, List<String> seats, String uuid, String orderId) throws InterruptedException {
-		long _start = System.currentTimeMillis();
-		DAOLogger.log(LogLevel.INFO, "LOG-HIBERNATE-TX", "DAO.bookTickets", "START", null, null);
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
 
@@ -716,16 +665,12 @@ public class DAO {
 				}
 
 				trans.commit();
-				DAOLogger.log(LogLevel.INFO, "LOG-HIBERNATE-TX", "DAO.bookTickets", "END", null,
-						java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "tickets", tickets.size()));
 				return tickets;
 
 			} catch (CustomExceptions e) {
 				throw e;
 			} catch (Exception e) {
 				if (trans.isActive()) trans.rollback();
-				DAOLogger.log(LogLevel.ERROR, "LOG-HIBERNATE-TX", "DAO.bookTickets", "ERROR", null,
-						java.util.Map.of("durationMs", System.currentTimeMillis() - _start, "error", e.getClass().getSimpleName()));
 				throw new CustomExceptions("Booking Failed", "Unable to book seats: " + e.getMessage());
 			}
 		}
@@ -734,6 +679,7 @@ public class DAO {
 	/**
 	 * Returns the seats after the booking transaction has been completed.
 	 */
+	@ObservedLog(category = "LOG-ENTITY", level = LogLevel.DEBUG)
 	public List<Seats> updatetedSeats(int screeningDateId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -751,6 +697,7 @@ public class DAO {
 	/**
 	 * Deletes individual ticket and sets the seat free.
 	 */
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized boolean cancelTicket(List<Integer> ticketIds, Integer purchaseId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -786,6 +733,7 @@ public class DAO {
 	/**
 	 * Deletes purchase with associated tickets.
 	 */
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized boolean deletePurchase(Integer purchaseId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -821,6 +769,7 @@ public class DAO {
 	}
 
 	//TODO: add controller and admin user in iOS
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized boolean deleteScreen(int screeningDateId) {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();
@@ -838,6 +787,7 @@ public class DAO {
 		}
 	}
 
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized Screen getScreenForAvailability(String movie, String date, String venue,
 														String screeningId, String category)
 			throws HibernateException, ParseException {
@@ -920,6 +870,7 @@ public class DAO {
 		}
 	}
 
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized Screen insertNewScreen(String movie, String date, String venue, int nrOfRows, int nrOfSeatsInRow, String screeningId, String category) throws HibernateException, ParseException {
 		Transaction transaction = null;
 		Screen screen = null;
@@ -928,7 +879,7 @@ public class DAO {
 			transaction = session.beginTransaction();
 
 			// Step 1: Get or create the screen
-			screen = DAO.instance().getScreenForAvailability(movie, date, venue, screeningId, category);
+			screen = getScreenForAvailability(movie, date, venue, screeningId, category);
 
 			// Flush to ensure the screen gets an ID before creating seats
 			session.saveOrUpdate(screen);
@@ -988,6 +939,7 @@ public class DAO {
 		return errorScreen;
 	}
 
+	@ObservedLog(category = "LOG-HIBERNATE-TX", level = LogLevel.INFO)
 	public synchronized Screen updateScreen(String Venue, int venuesId, int screeningDatesId, int moviesId, String screenId, String Date, String category) throws ParseException {
 		try (Session session = factory.openSession()) {
 			Transaction trans = session.beginTransaction();

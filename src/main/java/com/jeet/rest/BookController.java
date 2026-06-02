@@ -328,7 +328,7 @@ public class BookController implements Serializable {
 			@Context HttpServletRequest request_,
 			@QueryParam(value = "purchaseId") String purchaseId) throws IOException, InterruptedException {
 
-		List<Ticket> tickets = new BookingHandlerImpl().getTicketPerPurchase(Integer.valueOf(purchaseId));
+		List<Ticket> tickets = bookingHandler.getTicketPerPurchase(Integer.valueOf(purchaseId));
 
 		if (tickets.isEmpty()) {
 			throw new CustomExceptions("Error!", "No tickets available.");
@@ -501,7 +501,7 @@ public class BookController implements Serializable {
 			@PathParam(value = "order") String order) throws InterruptedException {
 		
 		
-		List<Movie> movies = new BookingHandlerImpl().searchMovies(name, order);
+		List<Movie> movies = bookingHandler.searchMovies(name, order);
 		
 		if (movies != null) {
 			
@@ -600,7 +600,7 @@ public class BookController implements Serializable {
     		@Context ServletContext contex) throws InterruptedException {
 		
 		//TODO PBI: use the variable X-Token and deviceId.
-		List<Movie> movies = new BookingHandlerImpl().getAllMovies(-1, "");
+		List<Movie> movies = bookingHandler.getAllMovies(-1, "");
 
 		if (movies.size() > 0) {
 			
@@ -653,7 +653,7 @@ public class BookController implements Serializable {
 			category = "";
 		}
 		
-		List<Movie> movies = new BookingHandlerImpl().getAllMovies(Integer.parseInt(setFirstResult), category);
+		List<Movie> movies = bookingHandler.getAllMovies(Integer.parseInt(setFirstResult), category);
 		if (movies.size() > 0) {
 			
 			JSONObject json = new JSONObject();
@@ -689,7 +689,7 @@ public class BookController implements Serializable {
 	public Response getVenuesForMovie(
 			@PathParam(value = "movieId") int movieId) throws InterruptedException {
 				
-		List<Venues> venue = new BookingHandlerImpl().getVenues(movieId);
+		List<Venues> venue = bookingHandler.getVenues(movieId);
 		
 		if (venue != null) {
 			
@@ -711,7 +711,7 @@ public class BookController implements Serializable {
 	public Response getLocationForMovie(
 			@PathParam(value = "movieId") int movieId) throws InterruptedException {
 				
-		List<Location> locations = new BookingHandlerImpl().getLocationForMovie(movieId);
+		List<Location> locations = bookingHandler.getLocationForMovie(movieId);
 		
 		if (!locations.isEmpty()) {
 			
@@ -774,7 +774,7 @@ public class BookController implements Serializable {
 	public Response getLocationForVenue(
 			@QueryParam(value = "venuesId") int venuesId) throws InterruptedException {
 				
-		Location location = new BookingHandlerImpl().getLocationForVenue(venuesId);
+		Location location = bookingHandler.getLocationForVenue(venuesId);
 		
 		if (location != null) {
 						
@@ -814,7 +814,7 @@ public class BookController implements Serializable {
 	@Produces(MediaType.APPLICATION_JSON)	
 	public Response getAllMoviesOnAllVenues() throws InterruptedException {
 				
-		List<Venues> venues = new BookingHandlerImpl().getAllVenuesForUpdate();
+		List<Venues> venues = bookingHandler.getAllVenuesForUpdate();
 		
 		if (venues != null) {
 			JSONObject json = new JSONObject();  
@@ -853,7 +853,7 @@ public class BookController implements Serializable {
 	public Response getAllMoviesOnAllVenuesWithCategory(
 					@QueryParam(value = "category") String category) throws InterruptedException {
 				
-		List<Venues> venues = new BookingHandlerImpl().getAllVenuesForUpdate();
+		List<Venues> venues = bookingHandler.getAllVenuesForUpdate();
 		
 		if (venues != null) {
 			JSONObject json = new JSONObject();  
@@ -893,7 +893,7 @@ public class BookController implements Serializable {
 	public Response getAllMoviesOnAllVenuesForSearch(
 					@QueryParam(value = "match") String match) throws InterruptedException {
 				
-		List<Venues> venues = new BookingHandlerImpl().getAllVenuesForUpdate();
+		List<Venues> venues = bookingHandler.getAllVenuesForUpdate();
 		
 		if (venues != null) {
 			JSONObject json = new JSONObject();  
@@ -935,7 +935,7 @@ public class BookController implements Serializable {
 			@PathParam(value = "locationId") int locationId,
 			@PathParam(value = "movieId") int movieId) throws InterruptedException {
 				
-		List<ScreeningDates> dates = new BookingHandlerImpl().getScreeningDatesForMovieOnVenue(locationId, movieId);
+		List<ScreeningDates> dates = bookingHandler.getScreeningDatesForMovieOnVenue(locationId, movieId);
 
 		if (dates != null) {
 			
@@ -957,7 +957,7 @@ public class BookController implements Serializable {
 	public Response getSeatsForScreenForMovieOnVenue (
 			@PathParam(value = "screeningDateId") int screeningDateId) throws InterruptedException {
 				
-		List<Seats> seats = new BookingHandlerImpl().getSeatsForScreenForMovieOnVenue(screeningDateId);
+		List<Seats> seats = bookingHandler.getSeatsForScreenForMovieOnVenue(screeningDateId);
 		
 		if (seats != null) {
 			
